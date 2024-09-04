@@ -1,0 +1,56 @@
+import json
+import re
+
+
+output_titles = True
+message_heading_level = 2
+conversations_json_path = "./sample.json"
+output_path = "./sample_out.md"
+format_code = True
+
+pat = r'([\s\S]+)(?:<antArtifact(?:[\s\S])*>)([\s\S]+)(?:<\/antArtifact>)([\s\S]+)'
+
+def print_list(x, len=-1, msg=""):
+   # print a list of strings by indices for debugging. 
+   # Use len=n to restrict printing to the first n characters of strings, len=-1 to print entire strings
+   print(msg)
+   for i, x_i in enumerate(x):
+      print(f"{i}: {x_i[:len]}")
+
+def convert_claude_json(
+        conversations_json_path=conversations_json_path,
+        output_path=output_path,
+        format_code=format_code,
+        output_titles=output_titles,
+        message_heading_level=message_heading_level,
+        verbose=True
+        ):
+    with open(conversations_json_path) as f_in:
+        convs = json.load(f_in)
+        f_in.close()
+        output_lines = []
+        with open(output_path, 'w') as f_out:
+            for conv in convs:
+                if output_titles:
+                    output_lines.append(f'# {conv["name"]}\n')
+                for msg in conv["chat_messages"]:
+                    output_lines.append(f"{'#'*message_heading_level} {msg['created_at'].split('.')[0]} \t {msg['sender']}\n")
+                    text = msg["text"]
+                    if format_code:
+                        if re.match(pat, text):
+                            match_groups  = [s for i, s in enumerate(re.match(pat, text).groups())]
+                            if verbose:
+                                print_list(match_groups, len=80, msg=f"found matches for code blocks in '{conv['name']}'")
+                        text = re.sub(pat, r"\1```\2```\3", text)
+                    output_lines.append(f"{text}\n")  # todo regex 
+            f_out.writelines(output_lines)
+
+if __name__  == "__main__":
+    convert_claude_json(
+        conversations_json_path=conversations_json_path,
+        output_path=output_path,
+        format_code=format_code,
+        output_titles=output_titles,
+        message_heading_level=message_heading_level,
+        verbose=True
+        )

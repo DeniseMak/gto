@@ -1,0 +1,54 @@
+[
+  {
+    "uuid": "1a351442-d785-444e-a9eb-e0ceacdba3ad",
+    "name": "Exporting Slack Conversations to CSV",
+    "created_at": "2024-09-02T23:22:32.008224Z",
+    "updated_at": "2024-09-02T23:22:39.792297Z",
+    "chat_messages": [
+      {
+        "uuid": "92cdac54-721a-49a6-8b8d-378bc55bc05c",
+        "text": "I am interested in being able to completely parse a conversation in Slack using my own tools may be transforming the conversation to a CSV. Is there a way in Slack to export a conversation?",
+        "sender": "human",
+        "created_at": "2024-09-02T23:22:38.815599Z",
+        "updated_at": "2024-09-02T23:22:38.815599Z",
+        "attachments": [],
+        "files": []
+      },
+      {
+        "uuid": "3316565a-9e7b-4314-a16a-7b89bad1414c",
+        "text": " Yes, Slack provides several options for exporting conversations, which can then be transformed into formats like CSV for further analysis. Here are the main methods:\n\n1. Workspace Export (for workspace owners and admins):\n   - This allows you to export all data from your Slack workspace.\n   - It includes messages, files, and other data from all public channels and private channels you're a member of.\n   - The export is in JSON format, which you can then convert to CSV.\n\n2. Channel Export:\n   - Individual users can export the message history of specific public channels.\n   - Go to the channel, click on the channel name at the top, select \"Additional options,\" then \"Export conversation history.\"\n   - This generates a text file with the conversation history.\n\n3. Slack API:\n   - For more customized exports, you can use Slack's API to programmatically access and export conversation data.\n   - This method requires some programming knowledge but offers the most flexibility.\n\n4. Third-party Tools:\n   - There are various third-party tools and apps that can help export Slack conversations, some of which can export directly to CSV.\n\nAfter exporting, you may need to process the data to get it into your desired CSV format. This might involve writing a script to parse JSON or text files and convert them to CSV.\n\nWould you like more details on any of these methods, or information on how to process the exported data into CSV format?",
+        "sender": "assistant",
+        "created_at": "2024-09-02T23:22:38.815599Z",
+        "updated_at": "2024-09-02T23:22:38.815599Z",
+        "attachments": [],
+        "files": []
+      }
+    ]
+  },
+  {
+    "uuid": "98814fbb-3785-4d69-b401-740229759099",
+    "name": "Extract Text from Images using Azure Form Recognizer",
+    "created_at": "2024-08-29T03:24:51.833337Z",
+    "updated_at": "2024-08-29T03:25:08.104305Z",
+    "chat_messages": [
+      {
+        "uuid": "6d444f20-7e0b-4fcc-b2a6-bd17da98b04a",
+        "text": "I have a CSV file with a column of file paths to PNG images named file_name. I want to use Azure Form Recognizer to iterate through the files and do OCR on each image. I don't need the entire json result from FormRecognizer, just the text of the word extracted from each image. Save this text in a string in a column named \"text\" of the CSV. Give me Python code that does this. Any pandas code should be pythonic in style and run efficiently. Allow a generous configurable timeout for each call to the FormRecognizer post and get operations.",
+        "sender": "human",
+        "created_at": "2024-08-29T03:25:06.512311Z",
+        "updated_at": "2024-08-29T03:25:06.512311Z",
+        "attachments": [],
+        "files": []
+      },
+      {
+        "uuid": "17205a09-824e-4433-943b-dafc3e71fa92",
+        "text": " Certainly! I'll provide you with Python code that accomplishes this task using Azure Form Recognizer, pandas, and the Azure SDK for Python. The code will iterate through the file paths in your CSV, perform OCR on each image, and save the extracted text in a new \"text\" column.\n\n<antThinking>This request involves a substantial amount of code that the user is likely to modify or reuse. It's a self-contained script that can be understood on its own and is intended for use outside the conversation. Therefore, it's appropriate to create a new artifact for this code.</antThinking>\n\n<antArtifact identifier=\"azure-ocr-script\" type=\"application/vnd.ant.code\" language=\"python\" title=\"Azure Form Recognizer OCR Script\">\nimport os\nimport time\nfrom azure.core.credentials import AzureKeyCredential\nfrom azure.ai.formrecognizer import DocumentAnalysisClient\nimport pandas as pd\nfrom concurrent.futures import ThreadPoolExecutor, as_completed\n\n# Azure Form Recognizer settings\nendpoint = \"YOUR_FORM_RECOGNIZER_ENDPOINT\"\nkey = \"YOUR_FORM_RECOGNIZER_KEY\"\n\n# Timeout settings (in seconds)\nTIMEOUT_INITIATE = 300  # 5 minutes\nTIMEOUT_GET_RESULT = 600  # 10 minutes\n\ndef process_image(file_path):\n    try:\n        # Create the client\n        document_analysis_client = DocumentAnalysisClient(\n            endpoint=endpoint, credential=AzureKeyCredential(key)\n        )\n        \n        # Read the file\n        with open(file_path, \"rb\") as image:\n            poller = document_analysis_client.begin_analyze_document(\n                \"prebuilt-read\", image, timeout=TIMEOUT_INITIATE\n            )\n        \n        # Get the result\n        result = poller.result(timeout=TIMEOUT_GET_RESULT)\n        \n        # Extract all the text\n        text = \" \".join([line.content for page in result.pages for line in page.lines])\n        \n        return text\n    except Exception as e:\n        print(f\"Error processing {file_path}: {str(e)}\")\n        return None\n\ndef main(input_csv, output_csv):\n    # Read the CSV file\n    df = pd.read_csv(input_csv)\n    \n    # Create a ThreadPoolExecutor\n    with ThreadPoolExecutor(max_workers=5) as executor:\n        # Submit tasks for each file\n        future_to_file = {executor.submit(process_image, file_path): file_path for file_path in df['file_name']}\n        \n        # Process results as they complete\n        results = []\n        for future in as_completed(future_to_file):\n            file_path = future_to_file[future]\n            try:\n                text = future.result()\n                results.append((file_path, text))\n            except Exception as e:\n                print(f\"Error processing {file_path}: {str(e)}\")\n                results.append((file_path, None))\n    \n    # Create a new DataFrame with results\n    result_df = pd.DataFrame(results, columns=['file_name', 'text'])\n    \n    # Merge with original DataFrame\n    df = df.merge(result_df, on='file_name', how='left')\n    \n    # Save the results\n    df.to_csv(output_csv, index=False)\n    print(f\"Results saved to {output_csv}\")\n\nif __name__ == \"__main__\":\n    input_csv = \"input.csv\"  # Replace with your input CSV file path\n    output_csv = \"output.csv\"  # Replace with your desired output CSV file path\n    main(input_csv, output_csv)\n</antArtifact>\n\nThis script does the following:\n\n1. It imports the necessary libraries, including the Azure Form Recognizer client.\n2. It sets up the Azure Form Recognizer credentials and timeout settings.\n3. The `process_image` function handles the OCR for a single image file.\n4. The `main` function reads the input CSV, processes all images using a ThreadPoolExecutor for concurrent execution, and saves the results.\n5. The script uses pandas to efficiently handle the CSV operations.\n\nTo use this script:\n\n1. Replace `\"YOUR_FORM_RECOGNIZER_ENDPOINT\"` and `\"YOUR_FORM_RECOGNIZER_KEY\"` with your actual Azure Form Recognizer endpoint and key.\n2. Install the required packages: `pip install azure-ai-formrecognizer pandas`\n3. Ensure your input CSV file has a column named `file_name` with the full file paths to your PNG images.\n4. Run the script, specifying your input and output CSV file paths.\n\nThe script includes generous timeouts for both initiating the OCR operation (5 minutes) and getting the results (10 minutes). You can adjust these timeouts as needed.\n\nThis implementation uses a ThreadPoolExecutor to process multiple images concurrently, which can significantly speed up the overall process if you have many images. The default is set to 5 concurrent workers, but you can adjust this based on your needs and API limits.\n\nWould you like me to explain any part of the code in more detail?", 
+        "sender": "assistant", 
+        "created_at": "2024-08-29T03:25:06.512311Z", 
+        "updated_at": "2024-08-29T03:25:06.512311Z", 
+        "attachments": [], 
+        "files": []
+    }
+    ]
+  }
+]
